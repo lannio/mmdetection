@@ -87,6 +87,7 @@ class TwoStageDetector(BaseDetector):
         outs = outs + (roi_outs, )
         return outs
 
+    # 1. mmdet/models/detectors/two_stage.py/TwoStageDetector 
     def forward_train(self,
                       img,
                       img_metas,
@@ -124,14 +125,18 @@ class TwoStageDetector(BaseDetector):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
+        # 先进行 backbone+neck 的特征提取
         x = self.extract_feat(img)
 
         losses = dict()
 
         # RPN forward and loss
+        # RPN forward and loss
         if self.with_rpn:
+            # 训练 RPN
             proposal_cfg = self.train_cfg.get('rpn_proposal',
                                               self.test_cfg.rpn)
+            # 主要是调用 rpn_head 内部的 forward_train 方法
             rpn_losses, proposal_list = self.rpn_head.forward_train(
                 x,
                 img_metas,
@@ -144,6 +149,7 @@ class TwoStageDetector(BaseDetector):
         else:
             proposal_list = proposals
 
+        # 第二阶段，主要是调用 roi_head 内部的 forward_train 方法
         roi_losses = self.roi_head.forward_train(x, img_metas, proposal_list,
                                                  gt_bboxes, gt_labels,
                                                  gt_bboxes_ignore, gt_masks,
@@ -151,6 +157,7 @@ class TwoStageDetector(BaseDetector):
         losses.update(roi_losses)
 
         return losses
+        # Head 模块核心是调用 self.rpn_head.forward_train 和 self.roi_head.forward_train 函数，输出 losses 和其他相关数据。
 
     async def async_simple_test(self,
                                 img,

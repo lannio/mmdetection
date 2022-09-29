@@ -16,6 +16,9 @@ from .dense_test_mixins import BBoxTestMixin
 
 @HEADS.register_module()
 class AnchorFreeHead(BaseDenseHead, BBoxTestMixin):
+    '''
+    AnchorFreeHead 逻辑比 AnchorHead 简单很多，主要是因为 anchor-free 类算法比 anchor-based 算法更加灵活多变，而且少了复杂的 anchor 生成过程，其 forward 方法实现和 AnchorHead 完全相同，而 loss 方法没有实现，其子类必须实现。
+    '''
     """Anchor-free head (FCOS, Fovea, RepPoints, etc.).
 
     Args:

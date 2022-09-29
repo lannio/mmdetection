@@ -29,6 +29,7 @@ from .pisa_retinanet_head import PISARetinaHead
 from .pisa_ssd_head import PISASSDHead
 from .reppoints_head import RepPointsHead
 from .retina_head import RetinaHead
+from .retina_head_weather import RetinaHeadWeather
 from .retina_sepbn_head import RetinaSepBNHead
 from .rpn_head import RPNHead
 from .sabl_retina_head import SABLRetinaHead
@@ -54,5 +55,6 @@ __all__ = [
     'AutoAssignHead', 'DETRHead', 'YOLOFHead', 'DeformableDETRHead',
     'SOLOHead', 'DecoupledSOLOHead', 'CenterNetHead', 'YOLOXHead',
     'DecoupledSOLOLightHead', 'LADHead', 'TOODHead', 'MaskFormerHead',
-    'Mask2FormerHead', 'SOLOV2Head', 'DDODHead'
+    'Mask2FormerHead', 'SOLOV2Head', 'DDODHead',
+    'RetinaHeadWeather'
 ]

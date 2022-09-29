@@ -147,7 +147,7 @@ def plot_confusion_matrix(confusion_matrix,
                           labels,
                           save_dir=None,
                           show=True,
-                          title='Normalized Confusion Matrix',
+                          title='Confusion Matrix',
                           color_theme='plasma'):
     """Draw confusion matrix with matplotlib.
 
@@ -167,7 +167,7 @@ def plot_confusion_matrix(confusion_matrix,
 
     num_classes = len(labels)
     fig, ax = plt.subplots(
-        figsize=(0.5 * num_classes, 0.5 * num_classes * 0.8), dpi=180)
+        figsize=(1 * num_classes, 1 * num_classes * 1), dpi=300)
     cmap = plt.get_cmap(color_theme)
     im = ax.imshow(confusion_matrix, cmap=cmap)
     plt.colorbar(mappable=im, ax=ax)

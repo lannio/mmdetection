@@ -646,10 +646,14 @@ class ResNet(BaseModule):
         return tuple(outs)
 
     def train(self, mode=True):
+        # 如果你自定义了骨架网络，想实现固定某一部分权重功能，你可以参考上述做法。
         """Convert the model into training mode while keep normalization layer
         freezed."""
+        # 这行代码会导致 BN 进入 train 模式
         super(ResNet, self).train(mode)
+        # 再次调用，固定 stem 和 前 n 个 stage 的 BN
         self._freeze_stages()
+        # 如果所有 BN 都采用全局均值和方差，则需要对整个网络的 BN 都开启 eval 模式
         if mode and self.norm_eval:
             for m in self.modules():
                 # trick: eval have effect on BatchNorm only

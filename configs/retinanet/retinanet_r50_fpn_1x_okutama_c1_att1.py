@@ -1,0 +1,34 @@
+_base_ = [
+    '../_base_/models/retinanet_r50_fpn.py',
+    '../_base_/datasets/okutama_detection_c1.py',
+    '../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py'
+]
+
+model = dict(
+    bbox_head=dict(
+        num_classes=1, # COCO 数据集类别个数
+    ), # 回归 loss
+    neck=dict(
+    type='ATTN_1_FPN',
+    in_channels=[256, 512, 1024, 2048], # 骨架多尺度特征图输出通道
+    out_channels=256,  # 增强后通道输出 # FPN 输出的每个尺度输出特征图通道 # 说明了 5 个输出特征图的通道数都是 256
+    start_level=1, # 从输入多尺度特征图的第几个开始计算 # 说明虽然输入是 4 个特征图，但是实际上 FPN 中仅仅用了后面三个
+    add_extra_convs='on_input',  # 输出num_outs个多尺度特征图 # 额外输出层的特征图来源 #  说明额外输出的 2 个特征图的来源是骨架网络输出，而不是 FPN 层本身输出又作为后面层的输
+    num_outs=5),
+)
+
+
+# optimizer
+optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
+
+'''
+retinanet 表示算法名称
+r50 等表示骨架网络名
+caffe 和 PyTorch 是指 Bottleneck 模块的区别，省略情况下表示是 PyTorch，后面会详细说明
+fpn 表示 Neck 模块采用了 FPN 结构
+mstrain 表示多尺度训练，一般对应的是 pipeline 中 Resize 类
+1x 表示 1 倍数的 epoch 训练即 12 个 epoch，2x 则表示 24 个 epcoh
+coco 表示在 COCO 数据集上训练
+'''
+
+# --> '../_base_/models/retinanet_r50_fpn.py'

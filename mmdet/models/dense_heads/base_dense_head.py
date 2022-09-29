@@ -327,18 +327,23 @@ class BaseDenseHead(BaseModule, metaclass=ABCMeta):
                 losses: (dict[str, Tensor]): A dictionary of loss components.
                 proposal_list (list[Tensor]): Proposals of each image.
         """
+        # 调用各个子类实现的 forward 方法
         outs = self(x)
         if gt_labels is None:
-            loss_inputs = outs + (gt_bboxes, img_metas)
+            loss_inputs = outs + (gt_bboxes, img_metas) # retinanet_weather的输出
         else:
             loss_inputs = outs + (gt_bboxes, gt_labels, img_metas)
+        # 调用各个子类实现的 loss 计算方法
         losses = self.loss(*loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
         if proposal_cfg is None:
             return losses
         else:
+             # two-stage 算法还需要返回 proposal
             proposal_list = self.get_bboxes(
                 *outs, img_metas=img_metas, cfg=proposal_cfg)
             return losses, proposal_list
+        # 每个算法的 Head 子类一般不会重写上述方法，但是每个 Head 子类都会重写 forward 和 loss 方法，其中 forward 方法用于运行 head 网络部分输出分类回归分支的特征图，而 loss 方法接收 forward 输出，并且结合 label 计算 loss。
+        # BaseDenseHead 基类过于简单，对于 anchor-based 和 anchor-free 算法又进一步进行了继承，得到 AnchorHead 或者 AnchorFreeHead 类。
 
     def simple_test(self, feats, img_metas, rescale=False):
         """Test function without test-time augmentation.

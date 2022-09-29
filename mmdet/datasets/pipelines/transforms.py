@@ -4,6 +4,7 @@ import inspect
 import math
 import warnings
 
+import torch
 import cv2
 import mmcv
 import numpy as np
@@ -81,7 +82,11 @@ class Resize:
                  bbox_clip_border=True,
                  backend='cv2',
                  interpolation='bilinear',
-                 override=False):
+                 override=False,
+                 weather=False,
+                 weather_scale = (480,640,3)):
+        self.weather_do = weather
+        self.weather_scale = weather_scale
         if img_scale is None:
             self.img_scale = None
         else:
@@ -106,6 +111,59 @@ class Resize:
         self.interpolation = interpolation
         self.override = override
         self.bbox_clip_border = bbox_clip_border
+
+        self.cloud = mmcv.imread('/home/yaoliu/code/UAV/mmdetection/mmdet/datasets/pipelines/perlinMap_1_1.png')
+        self.fog = mmcv.imread('/home/yaoliu/code/UAV/mmdetection/mmdet/datasets/pipelines/perlinMap_4_4.png')
+        # if (self.weather_do):
+        #     # if self.img_scale(0)==720:
+        #     #     self.weather_size=(540, 720, 3)
+        #     # else:
+        #     self.weather_size=self.weather_scale
+
+        #     self.y_tensor=torch.ones(self.weather_size)
+
+        #     noise_tensor_night=torch.ones(self.weather_size)-1
+        #     noise_tensor_day=torch.ones(self.weather_size)*255
+        #     cloud = mmcv.imread('/home/yaoliu/code/UAV/mmdetection/mmdet/datasets/pipelines/perlinMap_1_1.png')
+        #     cloud_tensor=torch.tensor(cloud)
+        #     cloud_tensor=torch.nn.functional.interpolate(cloud_tensor.permute(2,0,1).unsqueeze(0),(self.weather_size[0],self.weather_size[1]))
+        #     cloud_tensor= torch.squeeze(cloud_tensor).permute(1,2,0)
+        #     fog = mmcv.imread('/home/yaoliu/code/UAV/mmdetection/mmdet/datasets/pipelines/perlinMap_4_4.png')
+        #     fog_tensor=torch.tensor(fog)
+        #     fog_tensor=torch.nn.functional.interpolate(fog_tensor.permute(2,0,1).unsqueeze(0),(self.weather_size[0],self.weather_size[1]))
+        #     fog_tensor= torch.squeeze(fog_tensor).permute(1,2,0)
+        #     self.noise = [noise_tensor_night, noise_tensor_day, cloud_tensor, fog_tensor] 
+
+
+    def weather(self, img, a):
+        img_tensor = torch.tensor(img)
+
+        self.weather_size=img_tensor.shape
+
+        self.y_tensor=torch.ones(self.weather_size)
+
+        noise_tensor_night=torch.ones(self.weather_size)-1
+        noise_tensor_day=torch.ones(self.weather_size)*255
+        cloud = self.cloud
+        cloud_tensor=torch.tensor(cloud)
+        cloud_tensor=torch.nn.functional.interpolate(cloud_tensor.permute(2,0,1).unsqueeze(0),(self.weather_size[0],self.weather_size[1]))
+        cloud_tensor= torch.squeeze(cloud_tensor).permute(1,2,0)
+        fog = self.fog
+        fog_tensor=torch.tensor(fog)
+        fog_tensor=torch.nn.functional.interpolate(fog_tensor.permute(2,0,1).unsqueeze(0),(self.weather_size[0],self.weather_size[1]))
+        fog_tensor= torch.squeeze(fog_tensor).permute(1,2,0)
+        self.noise = [noise_tensor_night, noise_tensor_day, cloud_tensor, fog_tensor] 
+
+
+        noise_tensor = self.noise[random.randint(0,3)]
+        # print(self.weather_size)
+        # print(img_tensor.shape)
+        # print(noise_tensor.shape)
+        # print(self.y_tensor.shape)
+        result_tensor=a*img_tensor+(1-a)*noise_tensor + self.y_tensor
+        result = np.array(result_tensor)
+
+        return result
 
     @staticmethod
     def random_select(img_scales):
@@ -235,6 +293,8 @@ class Resize:
                     return_scale=True,
                     interpolation=self.interpolation,
                     backend=self.backend)
+            if (self.weather_do):
+                img = self.weather(img,0.3)
             results[key] = img
 
             scale_factor = np.array([w_scale, h_scale, w_scale, h_scale],

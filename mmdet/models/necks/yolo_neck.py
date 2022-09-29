@@ -33,14 +33,14 @@ class DetectionBlock(BaseModule):
     """
 
     def __init__(self,
-                 in_channels,
-                 out_channels,
+                 in_channels, # 1024
+                 out_channels, # 512
                  conv_cfg=None,
                  norm_cfg=dict(type='BN', requires_grad=True),
                  act_cfg=dict(type='LeakyReLU', negative_slope=0.1),
                  init_cfg=None):
         super(DetectionBlock, self).__init__(init_cfg)
-        double_out_channels = out_channels * 2
+        double_out_channels = out_channels * 2 #1024
 
         # shortcut
         cfg = dict(conv_cfg=conv_cfg, norm_cfg=norm_cfg, act_cfg=act_cfg)
@@ -90,9 +90,9 @@ class YOLOV3Neck(BaseModule):
     """
 
     def __init__(self,
-                 num_scales,
-                 in_channels,
-                 out_channels,
+                 num_scales, # 3
+                 in_channels, # [1024, 512, 256]
+                 out_channels, # [512, 256, 128]
                  conv_cfg=None,
                  norm_cfg=dict(type='BN', requires_grad=True),
                  act_cfg=dict(type='LeakyReLU', negative_slope=0.1),

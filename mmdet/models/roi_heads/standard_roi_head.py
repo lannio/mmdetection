@@ -60,6 +60,9 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
                       gt_bboxes_ignore=None,
                       gt_masks=None,
                       **kwargs):
+        '''
+        训练流程 训练流程最外层依然是调用 forward_train, 其核心代码如下所示：
+        '''
         """
         Args:
             x (list[Tensor]): list of multi-level img features.
@@ -87,9 +90,11 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
                 gt_bboxes_ignore = [None for _ in range(num_imgs)]
             sampling_results = []
             for i in range(num_imgs):
+                # 对每张图片进行 bbox 正负样本属性分配
                 assign_result = self.bbox_assigner.assign(
                     proposal_list[i], gt_bboxes[i], gt_bboxes_ignore[i],
                     gt_labels[i])
+                    # 然后进行正负样本采样
                 sampling_result = self.bbox_sampler.sample(
                     assign_result,
                     proposal_list[i],
@@ -101,6 +106,7 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
         losses = dict()
         # bbox head forward and loss
         if self.with_bbox:
+            # bbox 分支 forward，返回 loss
             bbox_results = self._bbox_forward_train(x, sampling_results,
                                                     gt_bboxes, gt_labels,
                                                     img_metas)
@@ -108,6 +114,7 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
 
         # mask head forward and loss
         if self.with_mask:
+             # mask 分支 forward,返回 loss
             mask_results = self._mask_forward_train(x, sampling_results,
                                                     bbox_results['bbox_feats'],
                                                     gt_masks, img_metas)
@@ -116,12 +123,14 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
         return losses
 
     def _bbox_forward(self, x, rois):
+        # roi 提取
         """Box head forward function used in both training and testing."""
         # TODO: a more flexible way to decide which feature maps to use
         bbox_feats = self.bbox_roi_extractor(
             x[:self.bbox_roi_extractor.num_inputs], rois)
         if self.with_shared_head:
             bbox_feats = self.shared_head(bbox_feats)
+        # bbox head 网络前向
         cls_score, bbox_pred = self.bbox_head(bbox_feats)
 
         bbox_results = dict(
@@ -132,10 +141,12 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
                             img_metas):
         """Run forward function and calculate loss for box head in training."""
         rois = bbox2roi([res.bboxes for res in sampling_results])
+         # forward
         bbox_results = self._bbox_forward(x, rois)
-
+        # 计算 target
         bbox_targets = self.bbox_head.get_targets(sampling_results, gt_bboxes,
                                                   gt_labels, self.train_cfg)
+        # 计算 loss
         loss_bbox = self.bbox_head.loss(bbox_results['cls_score'],
                                         bbox_results['bbox_pred'], rois,
                                         *bbox_targets)

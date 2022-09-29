@@ -173,9 +173,10 @@ class AnchorGenerator:
             y_center = self.center_offset * h
         else:
             x_center, y_center = center
-
+        # 计算高宽比例
         h_ratios = torch.sqrt(ratios)
         w_ratios = 1 / h_ratios
+        # base_size 乘上宽高比例乘上尺度，就可以得到 n 个 anchor 的原图尺度wh值
         if self.scale_major:
             ws = (w * w_ratios[:, None] * scales[None, :]).view(-1)
             hs = (h * h_ratios[:, None] * scales[None, :]).view(-1)
@@ -185,10 +186,12 @@ class AnchorGenerator:
 
         # use float anchor and the anchor's center is aligned with the
         # pixel center
+        # 得到 x1y1x2y2 格式的 base_anchor 坐标值
         base_anchors = [
             x_center - 0.5 * ws, y_center - 0.5 * hs, x_center + 0.5 * ws,
             y_center + 0.5 * hs
         ]
+        # 堆叠起来即可
         base_anchors = torch.stack(base_anchors, dim=-1)
 
         return base_anchors
@@ -373,6 +376,7 @@ class AnchorGenerator:
         # keep featmap_size as Tensor instead of int, so that we
         # can convert to ONNX correctly
         feat_h, feat_w = featmap_size
+        # 遍历特征图上所有位置，并且乘上 stride，从而变成原图坐标
         shift_x = torch.arange(0, feat_w, device=device) * stride[0]
         shift_y = torch.arange(0, feat_h, device=device) * stride[1]
 
@@ -382,12 +386,19 @@ class AnchorGenerator:
         # first feat_w elements correspond to the first row of shifts
         # add A anchors (1, A, 4) to K shifts (K, 1, 4) to get
         # shifted anchors (K, A, 4), reshape to (K*A, 4)
-
+        # (0,0) 位置的 base_anchor，假设原图上坐标 shifts，即可得到特征图上面每个点映射到原图坐标上的 anchor
         all_anchors = base_anchors[None, :, :] + shifts[:, None, :]
         all_anchors = all_anchors.view(-1, 4)
         # first A rows correspond to A anchors of (0, 0) in feature map,
         # then (0, 1), (0, 2), ...
         return all_anchors
+        '''
+        简单来说就是：假设一共 m 个输出特征图
+
+遍历 m 个输出特征图，在每个特征图的 (0,0) 或者说原图的 (0,0) 坐标位置生成 base_anchors，注意 base_anchors 不是特征图尺度，而是原图尺度
+遍历 m 个输出特征图中每个特征图上每个坐标点，将其映射到原图坐标上
+原图坐标点加上 base_anchors，就可以得到特征图每个位置的对应到原图尺度的 anchor 列表，anchor 列表长度为 m
+        '''
 
     def valid_flags(self, featmap_sizes, pad_shape, device='cuda'):
         """Generate valid flags of anchors in multiple feature levels.

@@ -13,7 +13,9 @@ from .base_dense_head import BaseDenseHead
 from .dense_test_mixins import BBoxTestMixin
 
 
+
 @HEADS.register_module()
+# BBoxTestMixin 是多尺度测试时候调用
 class AnchorHead(BaseDenseHead, BBoxTestMixin):
     """Anchor-based head (RPN, RetinaNet, SSD, etc.).
 
@@ -59,8 +61,11 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
                      type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0),
                  train_cfg=None,
                  test_cfg=None,
-                 init_cfg=dict(type='Normal', layer='Conv2d', std=0.01)):
+                 init_cfg=dict(type='Normal', layer='Conv2d', std=0.01),
+                 weather_loss = False):
         super(AnchorHead, self).__init__(init_cfg)
+        self.weather_loss = weather_loss
+
         self.in_channels = in_channels
         self.num_classes = num_classes
         self.feat_channels = feat_channels
@@ -133,6 +138,7 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
                                   1)
 
     def forward_single(self, x):
+        # head 模块分类回归分支输出
         """Forward feature of a single scale level.
 
         Args:
@@ -150,6 +156,8 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
         return cls_score, bbox_pred
 
     def forward(self, feats):
+        # feats 是 backbone+neck 输出的多个尺度图
+        # 对每张特征图单独计算预测输出
         """Forward features from the upstream network.
 
         Args:
@@ -168,7 +176,26 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
         """
         return multi_apply(self.forward_single, feats)
 
+    def L_ill(self,x):
+        batch_size = x.size()[0]
+        h_x = x.size()[2]
+        w_x = x.size()[3]
+        count_h =  (x.size()[2]-1) * x.size()[3]
+        count_w = x.size()[2] * (x.size()[3] - 1)
+        h_tv = torch.pow((x[:,:,1:,:]-x[:,:,:h_x-1,:]),2).sum()
+        w_tv = torch.pow((x[:,:,:,1:]-x[:,:,:,:w_x-1]),2).sum()
+        return (h_tv/count_h+w_tv/count_w)/batch_size
+
+    def L_noi(self,x):
+        loss = torch.pow(torch.norm(x, dim=(2,3)), 2)
+        return torch.mean(loss,1)
+
     def get_anchors(self, featmap_sizes, img_metas, device='cuda'):
+        '''
+        在 loss 函数中首先会调用 get_anchors 函数得到默认 anchor 列表。而 get_anchors 函数内部会先计算多尺度特征图上每个特征点位置的 anchor，然后再计算有效 anchor 标志(因为在组织 batch 时候有些图片会进行左上角 padding，这部分像素人为加的，不需要考虑 anchor)
+然后基于 anchor、gt bbox 以及其他必备信息调用 get_targets 函数计算每个预测分支对应的 target。get_targets 函数内部会调用 multi_apply(_get_targets_single) 函数对每张图片单独计算 target，而 _get_targets_single 函数实现的功能比较多，包括：bbox assigner、bbox sampler 和 bbox encoder 三个关键环节
+在得到 targets 后，调用 loss_single 函数计算每个输出尺度的 loss 值，最终返回各个分支的 loss
+        '''
         """Get anchors according to feature map sizes.
 
         Args:
@@ -435,6 +462,19 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
         # regression loss
         bbox_targets = bbox_targets.reshape(-1, 4)
         bbox_weights = bbox_weights.reshape(-1, 4)
+        if (self.weather_loss):
+            bbox_pred = bbox_pred[:,:-8,:,:]
+            r = bbox_pred[:,-8:-4,:,:]
+            n = bbox_pred[:,-4:,:,:]
+            
+            # Loss_ill = 1600*L_ill(A)
+			# loss_noise = 50*torch.mean(L_noi(N))
+
+            # print(r.shape)
+            # print(n.shape)
+            loss_r = 0.5*self.L_ill(r)
+            loss_n = 0.1*torch.mean(self.L_noi(n))
+
         bbox_pred = bbox_pred.permute(0, 2, 3, 1).reshape(-1, 4)
         if self.reg_decoded_bbox:
             # When the regression loss (e.g. `IouLoss`, `GIouLoss`)
@@ -447,7 +487,10 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
             bbox_targets,
             bbox_weights,
             avg_factor=num_total_samples)
-        return loss_cls, loss_bbox
+        if (self.weather_loss):
+             return loss_cls, loss_bbox, loss_r, loss_n
+        else:
+            return loss_cls, loss_bbox
 
     @force_fp32(apply_to=('cls_scores', 'bbox_preds'))
     def loss(self,
@@ -476,6 +519,13 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
             dict[str, Tensor]: A dictionary of loss components.
         """
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
+        # print(cls_scores[0].shape)
+        # print(cls_scores[1].shape)
+        # print(cls_scores[2].shape)
+        # print(cls_scores[3].shape)
+        # print(cls_scores[4].shape)
+        # print(len(featmap_sizes))
+        # print(self.prior_generator.num_levels)
         assert len(featmap_sizes) == self.prior_generator.num_levels
 
         device = cls_scores[0].device
@@ -506,18 +556,30 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
             concat_anchor_list.append(torch.cat(anchor_list[i]))
         all_anchor_list = images_to_levels(concat_anchor_list,
                                            num_level_anchors)
-
-        losses_cls, losses_bbox = multi_apply(
-            self.loss_single,
-            cls_scores,
-            bbox_preds,
-            all_anchor_list,
-            labels_list,
-            label_weights_list,
-            bbox_targets_list,
-            bbox_weights_list,
-            num_total_samples=num_total_samples)
-        return dict(loss_cls=losses_cls, loss_bbox=losses_bbox)
+        if (self.weather_loss) :
+            losses_cls, losses_bbox, losses_r , losses_n = multi_apply(
+                self.loss_single,
+                cls_scores,
+                bbox_preds,
+                all_anchor_list,
+                labels_list,
+                label_weights_list,
+                bbox_targets_list,
+                bbox_weights_list,
+                num_total_samples=num_total_samples)
+            return dict(loss_cls=losses_cls, loss_bbox=losses_bbox, losses_r=losses_r, losses_n=losses_n)
+        else:
+            losses_cls, losses_bbox = multi_apply(
+                self.loss_single,
+                cls_scores,
+                bbox_preds,
+                all_anchor_list,
+                labels_list,
+                label_weights_list,
+                bbox_targets_list,
+                bbox_weights_list,
+                num_total_samples=num_total_samples)
+            return dict(loss_cls=losses_cls, loss_bbox=losses_bbox)
 
     def aug_test(self, feats, img_metas, rescale=False):
         """Test function with test time augmentation.

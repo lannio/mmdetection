@@ -108,6 +108,7 @@ def parse_args():
 def main():
     args = parse_args()
 
+    # 1.初始化配置
     cfg = Config.fromfile(args.config)
 
     # replace the ${key} with the value of cfg.key
@@ -165,6 +166,7 @@ def main():
         cfg.gpu_ids = [args.gpu_id]
 
     # init distributed env first, since logger depends on the dist info.
+    # 2.判断是否为分布式训练模式
     if args.launcher == 'none':
         distributed = False
     else:
@@ -181,12 +183,16 @@ def main():
     # init the logger before other steps
     timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
     log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
+    
+    # 3.初始化 logger
     logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
 
     # init the meta dict to record some important information such as
     # environment info and seed, which will be logged
     meta = dict()
     # log env info
+
+    # 4.收集运行环境并且打印，方便排查硬件和软件相关问题
     env_info_dict = collect_env()
     env_info = '\n'.join([(f'{k}: {v}') for k, v in env_info_dict.items()])
     dash_line = '-' * 60 + '\n'
@@ -209,12 +215,14 @@ def main():
     meta['seed'] = seed
     meta['exp_name'] = osp.basename(args.config)
 
+    # 5.初始化 model
     model = build_detector(
         cfg.model,
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
 
+    # 6.初始化 datasets
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
@@ -240,3 +248,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# 下一步
+#=================== mmdet/apis/train.py ==================

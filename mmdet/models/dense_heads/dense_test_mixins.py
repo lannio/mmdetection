@@ -12,6 +12,9 @@ if sys.version_info >= (3, 7):
 
 
 class BBoxTestMixin(object):
+    '''
+    除了 RPN 算法的多尺度测试是在mmdet/models/dense_heads/rpn_test_mixin.py，其余 Head 多尺度测试都是在 mmdet/models/dense_heads/dense_test_mixins.py/BBoxTestMixin 中实现，其思路是对多尺度图片中每张图片单独运行 get_bboxes，然后还原到原图尺度，最后把多尺度图片预测结果合并进行统一 nms。
+    '''
     """Mixin class for testing det bboxes via DenseHead."""
 
     def simple_test_bboxes(self, feats, img_metas, rescale=False):

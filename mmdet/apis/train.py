@@ -146,9 +146,11 @@ def train_detector(model,
         **cfg.data.get('train_dataloader', {})
     }
 
+    # 1.初始化 data_loaders ，内部会初始化 GroupSampler
     data_loaders = [build_dataloader(ds, **train_loader_cfg) for ds in dataset]
 
     # put model on gpus
+    # 2.基于是否使用分布式训练，初始化对应的 DataParallel
     if distributed:
         find_unused_parameters = cfg.get('find_unused_parameters', False)
         # Sets the `find_unused_parameters` parameter in
@@ -166,6 +168,7 @@ def train_detector(model,
     auto_scale_lr(cfg, distributed, logger)
     optimizer = build_optimizer(model, cfg.optimizer)
 
+    # 3.初始化 runner
     runner = build_runner(
         cfg.runner,
         default_args=dict(
@@ -189,6 +192,7 @@ def train_detector(model,
         optimizer_config = cfg.optimizer_config
 
     # register hooks
+    # 4.注册必备 hook
     runner.register_training_hooks(
         cfg.lr_config,
         optimizer_config,
@@ -228,8 +232,12 @@ def train_detector(model,
         eval_hook = DistEvalHook if distributed else EvalHook
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
+        # 5.如果需要 val，则还需要注册 EvalHook   
         runner.register_hook(
             eval_hook(val_dataloader, **eval_cfg), priority='LOW')
+
+    # 6.注册用户自定义 hook
+    # runner.register_hook(hook, priority=priority)
 
     resume_from = None
     if cfg.resume_from is None and cfg.get('auto_resume'):
@@ -237,8 +245,13 @@ def train_detector(model,
     if resume_from is not None:
         cfg.resume_from = resume_from
 
+    # 7.权重恢复和加载
     if cfg.resume_from:
         runner.resume(cfg.resume_from)
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)
+
+    # 8.运行，开始训练
     runner.run(data_loaders, cfg.workflow)
+
+    # .local/lib/python3.6/site-packages/mmcv/runner/__init__.py

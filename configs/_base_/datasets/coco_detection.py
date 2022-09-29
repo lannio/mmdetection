@@ -16,7 +16,7 @@ train_pipeline = [
 test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
-        type='MultiScaleFlipAug',
+        type='MultiScaleFlipAug', # 多尺度测试
         img_scale=(1333, 800),
         flip=False,
         transforms=[

@@ -60,6 +60,9 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
         assert isinstance(imgs, list)
         return [self.extract_feat(img) for img in imgs]
 
+    # 2. forward_train 和 forward_test 需要在不同的算法子类中实现，输出是 Loss 或者 预测结果
+    # mmdet/models/detectors/two_stage.py/TwoStageDetector
+    # SingleStageDetector 
     def forward_train(self, imgs, img_metas, **kwargs):
         """
         Args:
@@ -108,7 +111,8 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
             return await self.async_simple_test(img[0], img_metas[0], **kwargs)
         else:
             raise NotImplementedError
-
+    # 3. forward_test
+    # 如果是单尺度测试，则会调用 TwoStageDetector 或 SingleStageDetector 中的 simple_test 方法，如果是多尺度测试，则调用 aug_test 方法
     def forward_test(self, imgs, img_metas, **kwargs):
         """
         Args:
@@ -218,6 +222,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
 
         return loss, log_vars
 
+    # 1. mmdet/models/detectors/base.py/BaseDetector
     def train_step(self, data, optimizer):
         """The iteration step during training.
 
@@ -245,9 +250,11 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                   DDP, it means the batch size on each GPU), which is used for
                   averaging the logs.
         """
+        # 调用本类自身的 forward 方法
         losses = self(**data)
+        # 解析 loss
         loss, log_vars = self._parse_losses(losses)
-
+        # 返回字典对象
         outputs = dict(
             loss=loss, log_vars=log_vars, num_samples=len(data['img_metas']))
 

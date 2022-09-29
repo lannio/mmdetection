@@ -43,7 +43,13 @@ class FPN(BaseModule):
             Default: dict(mode='nearest').
         init_cfg (dict or list[dict], optional): Initialization config dict.
 
-    Example:
+    Example:        
+        type='FPN',
+        in_channels=[256, 512, 1024, 2048], # 骨架多尺度特征图输出通道
+        out_channels=256,  # 增强后通道输出 # FPN 输出的每个尺度输出特征图通道 # 说明了 5 个输出特征图的通道数都是 256
+        start_level=1, # 从输入多尺度特征图的第几个开始计算 # 说明虽然输入是 4 个特征图，但是实际上 FPN 中仅仅用了后面三个
+        add_extra_convs='on_input',  # 输出num_outs个多尺度特征图 # 额外输出层的特征图来源 #  说明额外输出的 2 个特征图的来源是骨架网络输出，而不是 FPN 层本身输出又作为后面层的输
+        num_outs=5),  # FPN 输出特征图个数 #说明 FPN 模块虽然是接收 3 个特征图，但是输出 5 个特征图
         >>> import torch
         >>> in_channels = [2, 3, 5, 7]
         >>> scales = [340, 170, 84, 43]
@@ -60,12 +66,12 @@ class FPN(BaseModule):
     """
 
     def __init__(self,
-                 in_channels,
-                 out_channels,
-                 num_outs,
-                 start_level=0,
+                 in_channels,   # [256, 512, 1024, 2048]
+                 out_channels,  # 256
+                 num_outs,      # 5
+                 start_level=0, # 1
                  end_level=-1,
-                 add_extra_convs=False,
+                 add_extra_convs=False,     # 'on_input'
                  relu_before_extra_convs=False,
                  no_norm_on_lateral=False,
                  conv_cfg=None,

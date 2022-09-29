@@ -53,7 +53,7 @@ class SingleStageDetector(BaseDetector):
         x = self.extract_feat(img)
         outs = self.bbox_head(x)
         return outs
-
+    # 1. SingleStageDetector 
     def forward_train(self,
                       img,
                       img_metas,
@@ -79,10 +79,23 @@ class SingleStageDetector(BaseDetector):
             dict[str, Tensor]: A dictionary of loss components.
         """
         super(SingleStageDetector, self).forward_train(img, img_metas)
+        # 先进行 backbone+neck 的特征提取
         x = self.extract_feat(img)
+        # 主要是调用 bbox_head 内部的 forward_train 方法
         losses = self.bbox_head.forward_train(x, img_metas, gt_bboxes,
                                               gt_labels, gt_bboxes_ignore)
         return losses
+        # mmdet/models/dense_heads/base_dense_head.py/BaseDenseHead
+    '''
+    (2) 测试流程
+
+    调用 MMDataParallel 或 MMDistributedDataParallel 中的 forward 方法
+    调用 base.py 中的 forward 方法
+    调用 base.py 中的 self.forward_test 方法
+    如果是单尺度测试，则会调用 TwoStageDetector 或 SingleStageDetector 中的 simple_test 方法，如果是多尺度测试，则调用 aug_test 方法
+    最终调用的是每个具体 Head 模块的 simple_test 或者 aug_test 方法(one-stage 和 two-stage 的 head 调用逻辑有些区别)
+    可以看出在测试阶段，主要是调用了 Head 模块自身的 simple_test 或 aug_test 方法。
+    '''
 
     def simple_test(self, img, img_metas, rescale=False):
         """Test function without test-time augmentation.
